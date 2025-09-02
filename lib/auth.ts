@@ -3,9 +3,12 @@ import { cookies } from "next/headers"
 import type { NextResponse } from "next/server"
 import bcrypt from "bcryptjs"
 
-// In a real app, these would be in .env
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || "your-secret-key")
+// Authentication configuration
+const JWT_SECRET = new TextEncoder().encode(
+  process.env.JWT_SECRET || "4f7d9a2c1e6b0f8c3a5d9e2f7b1c4a8d3e6f9a2c5b8d1e4f7a0c3b6d9e2f5a8"
+)
 const COOKIE_NAME = "auth-token"
+const NODE_ENV = process.env.NODE_ENV || "development"
 
 export type UserRole = "user" | "admin"
 
@@ -49,7 +52,7 @@ export async function setAuthCookie(response: NextResponse, token: string): Prom
     name: COOKIE_NAME,
     value: token,
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: NODE_ENV === "production",
     sameSite: "strict",
     maxAge: 60 * 60 * 24 * 7, // 7 days
     path: "/",
@@ -80,7 +83,7 @@ export function clearAuthCookie(response: NextResponse): NextResponse {
     name: COOKIE_NAME,
     value: "",
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: NODE_ENV === "production",
     maxAge: 0,
     path: "/",
   })

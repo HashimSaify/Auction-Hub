@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: auction-hub
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        value: mongodb+srv://User-1:Hatimali53@cluster0.hz2cypa.mongodb.net/auction-hub?retryWrites=true&w=majority
+      - key: JWT_SECRET
+        generateValue: true
+      - key: NEXTAUTH_SECRET
+        generateValue: true
+      - key: NEXTAUTH_URL
+        sync: false
+    plan: free

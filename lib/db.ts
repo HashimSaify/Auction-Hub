@@ -2,9 +2,8 @@ import mongoose from "mongoose"
 // Import models to ensure they are registered
 import "./models"
 
-const MONGODB_URI =
-  process.env.MONGODB_URI ||
-  "mongodb+srv://User-1:Hatimali53@cluster0.hz2cypa.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+// MongoDB connection configuration
+const MONGODB_URI = process.env.MONGODB_URI || "mongodb+srv://User-1:Hatimali53@cluster0.hz2cypa.mongodb.net/auction-hub?retryWrites=true&w=majority"
 
 interface GlobalWithMongoose {
   mongoose: {
