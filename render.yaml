@@ -2,7 +2,7 @@ services:
   - type: web
     name: auction-hub
     env: node
-    buildCommand: npm install && npm run build
+    buildCommand: npm run build
     startCommand: npm start
     envVars:
       - key: NODE_ENV
@@ -15,4 +15,6 @@ services:
         generateValue: true
       - key: NEXTAUTH_URL
         sync: false
+      - key: PORT
+        value: 10000
     plan: free
