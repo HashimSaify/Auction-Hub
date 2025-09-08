@@ -1,16 +1,3 @@
-let userConfig = undefined
-try {
-  // try to import ESM first
-  userConfig = await import('./v0-user-next.config.mjs')
-} catch (e) {
-  try {
-    // fallback to CJS import
-    userConfig = await import("./v0-user-next.config");
-  } catch (innerError) {
-    // ignore error
-  }
-}
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   eslint: {
@@ -22,10 +9,50 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  experimental: {
-    webpackBuildWorker: true,
-    parallelServerBuildTraces: true,
-    parallelServerCompiles: true,
+  // Enable static exports for better deployment
+  output: 'standalone',
+  
+  // Webpack configuration
+  webpack: (config, { isServer }) => {
+    // Fixes npm packages that depend on `node:` protocol
+    config.resolve.fallback = { 
+      ...config.resolve.fallback,
+      fs: false,
+      net: false,
+      tls: false,
+      dns: 'mock',
+      child_process: false
+    };
+    
+    // Reduce chunk size
+    config.optimization.splitChunks = {
+      chunks: 'all',
+      maxSize: 244 * 1024, // 244KB
+      cacheGroups: {
+        default: false,
+        vendors: false,
+      },
+    };
+
+    return config;
+  },
+  
+  // Disable React StrictMode for now to avoid double rendering in development
+  reactStrictMode: false,
+  
+  // Add cache headers
+  async headers() {
+    return [
+      {
+        source: '/_next/static/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+    ];
   },
 }
 
