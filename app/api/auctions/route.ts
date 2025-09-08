@@ -4,9 +4,27 @@ import { AuctionItem } from "@/lib/models"
 import { getCurrentUser } from "@/lib/auth"
 import mongoose from "mongoose"
 
+// Ensure indexes are created
+async function ensureIndexes() {
+  try {
+    await AuctionItem.ensureIndexes()
+  } catch (error) {
+    console.error("Error ensuring indexes:", error)
+  }
+}
+
+// Run once when the server starts
+let indexesEnsured = false
+
 export async function GET(request: NextRequest) {
   try {
     await connectToDatabase()
+    
+    // Ensure indexes are created (only once)
+    if (!indexesEnsured) {
+      await ensureIndexes()
+      indexesEnsured = true
+    }
 
     const searchParams = request.nextUrl.searchParams
     const page = parseInt(searchParams.get("page") || "1")
@@ -28,10 +46,15 @@ export async function GET(request: NextRequest) {
     }
 
     if (search) {
-      query.$or = [
-        { title: { $regex: search, $options: "i" } },
-        { description: { $regex: search, $options: "i" } },
-      ]
+      // Use text search if available, otherwise fall back to regex
+      if (search.length > 2) { // Only use text search for longer queries
+        query.$text = { $search: search }
+      } else {
+        query.$or = [
+          { title: { $regex: search, $options: "i" } },
+          { description: { $regex: search, $options: "i" } },
+        ]
+      }
     }
 
     // Build sort
@@ -56,16 +79,36 @@ export async function GET(request: NextRequest) {
         sortQuery.endTime = 1
     }
 
-    // Execute query with pagination
+    // Execute optimized query with pagination
     const skip = (page - 1) * limit
+    
+    // Only fetch necessary fields
+    const projection = {
+      title: 1,
+      description: 1,
+      currentBid: 1,
+      endTime: 1,
+      imageUrl: 1,
+      seller: 1,
+      bids: { $size: "$bids" }, // Just get the count, not the full array
+      createdAt: 1,
+      category: 1
+    }
+    
+    // Use estimatedDocumentCount for faster count when possible
+    const countPromise = search || category || minPrice > 0 || maxPrice < Infinity
+      ? AuctionItem.countDocuments(query)
+      : AuctionItem.estimatedDocumentCount()
+    
     const [auctions, total] = await Promise.all([
-      AuctionItem.find(query)
+      AuctionItem.find(query, projection)
         .sort(sortQuery)
         .skip(skip)
         .limit(limit)
         .populate("seller", "name")
-        .lean(),
-      AuctionItem.countDocuments(query),
+        .lean()
+        .maxTimeMS(5000), // Add timeout to prevent hanging
+      countPromise,
     ])
 
     return NextResponse.json({

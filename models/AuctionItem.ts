@@ -118,6 +118,7 @@ const AuctionItemSchema = new Schema<IAuctionItem>(
   },
   {
     timestamps: true,
+    autoIndex: process.env.NODE_ENV !== 'production' // Auto-index in development only
   },
 )
 
@@ -129,10 +130,81 @@ AuctionItemSchema.pre('save', function(next) {
   next();
 });
 
-// Create indexes for better query performance
-AuctionItemSchema.index({ category: 1 })
-AuctionItemSchema.index({ status: 1 })
-AuctionItemSchema.index({ endTime: 1 })
-AuctionItemSchema.index({ currentBid: 1 })
+// Add text index for search functionality
+AuctionItemSchema.index(
+  { title: 'text', description: 'text' },
+  { 
+    weights: { 
+      title: 3, 
+      description: 1 
+    },
+    name: 'text_search_index',
+    default_language: 'english',
+    language_override: 'none'
+  }
+)
+
+// Compound indexes for common queries
+AuctionItemSchema.index(
+  { status: 1, endTime: 1 },
+  { name: 'status_endtime_index' }
+)
+
+AuctionItemSchema.index(
+  { category: 1, status: 1, currentBid: 1 },
+  { name: 'category_status_price_index' }
+)
+
+AuctionItemSchema.index(
+  { seller: 1, status: 1, createdAt: -1 },
+  { name: 'seller_status_created_index' }
+)
+
+AuctionItemSchema.index(
+  { currentBid: 1, status: 1 },
+  { name: 'price_status_index' }
+)
+
+AuctionItemSchema.index(
+  { endTime: 1, status: 1 },
+  { name: 'endtime_status_index' }
+)
+
+AuctionItemSchema.index(
+  { bids: 1, status: 1 },
+  { name: 'bids_status_index' }
+)
+
+// Add a pre-save hook to update the status based on endTime
+AuctionItemSchema.pre('save', function(next) {
+  if (this.isModified('endTime') || this.isNew) {
+    if (this.endTime < new Date()) {
+      this.status = 'ended';
+    } else if (this.status === 'pending' && this.endTime > new Date()) {
+      this.status = 'active';
+    }
+  }
+  next();
+});
+
+// Add a static method to update expired auctions
+AuctionItemSchema.statics.updateExpiredAuctions = async function() {
+  return this.updateMany(
+    { 
+      status: 'active',
+      endTime: { $lt: new Date() }
+    },
+    { $set: { status: 'ended' } }
+  );
+};
+
+// Create a TTL index for automatic cleanup of old auctions
+AuctionItemSchema.index(
+  { updatedAt: 1 },
+  { 
+    expireAfterSeconds: 60 * 60 * 24 * 90, // 90 days
+    partialFilterExpression: { status: { $in: ['ended', 'sold'] } }
+  }
+);
 
 export default mongoose.models.AuctionItem || mongoose.model<IAuctionItem>("AuctionItem", AuctionItemSchema)
